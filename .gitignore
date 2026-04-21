@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Local environments / notebooks
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Raw data and large reference material
+dataset/
+paper baseline/
+paper reference/
+
+# Generated outputs
+eda_outputs/
+preprocessed_outputs/
+preprocessed_outputs_v2/
+baseline_results/
+baseline_results_v2/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
