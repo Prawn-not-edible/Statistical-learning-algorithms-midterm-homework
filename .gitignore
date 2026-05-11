@@ -11,6 +11,8 @@ venv/
 dataset/
 paper baseline/
 paper reference/
+*.ckpt
+tabpfn_weights/
 
 # Generated outputs
 eda_outputs/
