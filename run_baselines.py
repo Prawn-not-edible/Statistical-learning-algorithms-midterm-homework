@@ -142,10 +142,16 @@ def run_catboost(split, labels):
     return score_predictions(split["y_val"], pred, proba, labels)
 
 
-def run_tabpfn(split, labels):
+def run_tabpfn(split, labels, model_path: Path | None, device: str):
     from tabpfn import TabPFNClassifier
 
-    model = TabPFNClassifier()
+    model_kwargs = {}
+    if model_path is not None:
+        model_kwargs["model_path"] = str(model_path)
+    if device != "auto":
+        model_kwargs["device"] = device
+
+    model = TabPFNClassifier(**model_kwargs)
     model.fit(split["X_train"], split["y_train"])
     proba = ensure_proba_array(model.predict_proba(split["X_val"]), labels)
     pred = model.predict(split["X_val"])
@@ -210,6 +216,17 @@ def parse_args():
         help="If provided, preprocessing will also generate clipped sample weights.",
     )
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
+    parser.add_argument(
+        "--tabpfn-model-path",
+        type=Path,
+        default=None,
+        help="Optional local TabPFN classifier checkpoint path, e.g. tabpfn_weights/tabpfn-v2.6-classifier-v2.6_default.ckpt.",
+    )
+    parser.add_argument(
+        "--tabpfn-device",
+        default="auto",
+        help="Device passed to TabPFNClassifier. Use auto, cuda, cuda:0, cuda:1, or cpu.",
+    )
     return parser.parse_args()
 
 
@@ -234,6 +251,13 @@ def main():
                     labels=labels,
                     output_dir=args.output_dir,
                     use_weights=args.weight_mode != "none",
+                )
+            elif model_name == "tabpfn":
+                result = run_tabpfn(
+                    split,
+                    labels=labels,
+                    model_path=args.tabpfn_model_path,
+                    device=args.tabpfn_device,
                 )
             else:
                 result = MODEL_RUNNERS[model_name](split, labels)
@@ -271,6 +295,8 @@ def main():
                 "test_size": args.test_size,
                 "weight_mode": args.weight_mode,
                 "class_weight_clip": args.class_weight_clip,
+                "tabpfn_model_path": str(args.tabpfn_model_path) if args.tabpfn_model_path else None,
+                "tabpfn_device": args.tabpfn_device,
                 "pythonhashseed": os.environ.get("PYTHONHASHSEED"),
             },
             f,
