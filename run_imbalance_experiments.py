@@ -281,20 +281,42 @@ def run_two_stage(split, labels, args):
 
 
 def write_report(output_dir, final_rows, prior_df, synth_df, stage_df, reports):
-    def table_text(df: pd.DataFrame) -> str:
-        return df.to_string(index=False)
+    column_name_map = {
+        "experiment": "实验组",
+        "log_loss": "Log Loss",
+        "macro_f1": "Macro F1",
+        "accuracy": "Accuracy",
+        "class1_recall": "Class 1 Recall",
+        "minority_recall": "少数类整体 Recall",
+        "synthetic_class1_count": "合成 Class 1 数量",
+        "stage1_pos_weight": "Stage 1 少数类权重",
+        "stage1_threshold": "Stage 1 阈值",
+        "stage1_minority_recall": "Stage 1 少数类召回率",
+        "stage1_false_positives": "Stage 1 误报数",
+        "stage1_flagged": "Stage 1 判为异常数量",
+    }
 
-    report_path = output_dir / "imbalance_experiments_report.md"
+    def localize_columns(df: pd.DataFrame) -> pd.DataFrame:
+        return df.rename(columns={c: column_name_map.get(c, c) for c in df.columns})
+
+    def table_text(df: pd.DataFrame) -> str:
+        return localize_columns(df).to_string(index=False)
+
+    report_path = output_dir / "不平衡处理实验结果与分析.md"
     lines = [
-        "# Imbalance Experiments Report",
+        "# 不平衡处理实验结果与分析",
         "",
-        "## Final Comparison",
+        "## 1. 实验目的",
+        "",
+        "前一轮五个 baseline 模型的主要问题是：Accuracy 和 Log Loss 看起来不错，但 Macro F1 很低，少数类 `label=1~5` 基本没有被识别出来。因此，本脚本集中比较三类不平衡处理方法：TabPFN 先验修正、Class 1 合成增强、LightGBM + TabPFN 两阶段模型。",
+        "",
+        "## 2. 最终结果汇总",
         "",
         "```text",
         table_text(final_rows),
         "```",
         "",
-        "## Best Classification Reports",
+        "## 3. 最优实验组分类报告",
         "",
     ]
     for name, text in reports.items():
@@ -302,23 +324,33 @@ def write_report(output_dir, final_rows, prior_df, synth_df, stage_df, reports):
 
     lines.extend(
         [
-            "## Prior Correction Scan",
+            "## 4. 实验1：TabPFN + 先验概率修正扫描",
+            "",
+            "这个实验通过替换类别先验，让模型更愿意预测少数类。它通常会提高少数类召回率，但也可能带来更多误报，并使 Log Loss 变差。",
             "",
             "```text",
             table_text(prior_df.drop(columns=["target_prior"], errors="ignore")),
             "```",
             "",
-            "## Synthetic Class 1 Augmentation",
+            "## 5. 实验2：TabPFN + Class 1 合成数据增强",
+            "",
+            "这个实验对训练集中的 Class 1 样本做简单合成增强，再重新拟合 TabPFN。它用于观察增加极少数类样本后，模型是否更容易识别 Class 1。",
             "",
             "```text",
-            table_text(synth_df) if not synth_df.empty else "Synthetic augmentation was skipped.",
+            table_text(synth_df) if not synth_df.empty else "本轮跳过了合成增强实验。",
             "```",
             "",
-            "## Two-stage Scan",
+            "## 6. 实验3：LightGBM + TabPFN 两阶段模型扫描",
+            "",
+            "这个实验先用 LightGBM 判断样本是否为异常类，即 `label>0`，再把判为异常的样本交给 TabPFN 做少数类细分。该结构的目标是把“异常检测”和“少数类细分类”拆开处理。",
             "",
             "```text",
             table_text(stage_df),
             "```",
+            "",
+            "## 7. 结果解读建议",
+            "",
+            "阅读结果时建议优先看 `Macro F1`、`Class 1 Recall` 和 `少数类整体 Recall`，不要只看 Accuracy。对于这份极端不平衡数据，Accuracy 很容易被多数类 `label=0` 主导。如果某个方法显著提升 Macro F1，但 Class 1 Recall 仍为 0，需要在报告中明确说明：该方法改善了整体少数类识别，但还没有真正解决最稀有类别的识别问题。",
             "",
         ]
     )
