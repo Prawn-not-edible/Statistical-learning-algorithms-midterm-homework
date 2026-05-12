@@ -281,42 +281,24 @@ def run_two_stage(split, labels, args):
 
 
 def write_report(output_dir, final_rows, prior_df, synth_df, stage_df, reports):
-    column_name_map = {
-        "experiment": "实验组",
-        "log_loss": "Log Loss",
-        "macro_f1": "Macro F1",
-        "accuracy": "Accuracy",
-        "class1_recall": "Class 1 Recall",
-        "minority_recall": "少数类整体 Recall",
-        "synthetic_class1_count": "合成 Class 1 数量",
-        "stage1_pos_weight": "Stage 1 少数类权重",
-        "stage1_threshold": "Stage 1 阈值",
-        "stage1_minority_recall": "Stage 1 少数类召回率",
-        "stage1_false_positives": "Stage 1 误报数",
-        "stage1_flagged": "Stage 1 判为异常数量",
-    }
-
-    def localize_columns(df: pd.DataFrame) -> pd.DataFrame:
-        return df.rename(columns={c: column_name_map.get(c, c) for c in df.columns})
-
     def table_text(df: pd.DataFrame) -> str:
-        return localize_columns(df).to_string(index=False)
+        return df.to_string(index=False)
 
     report_path = output_dir / "不平衡处理实验结果与分析.md"
     lines = [
-        "# 不平衡处理实验结果与分析",
+        "# Imbalance Experiment Results and Analysis",
         "",
-        "## 1. 实验目的",
+        "## 1. Experiment Goal",
         "",
-        "前一轮五个 baseline 模型的主要问题是：Accuracy 和 Log Loss 看起来不错，但 Macro F1 很低，少数类 `label=1~5` 基本没有被识别出来。因此，本脚本集中比较三类不平衡处理方法：TabPFN 先验修正、Class 1 合成增强、LightGBM + TabPFN 两阶段模型。",
+        "The previous five baseline models achieved high Accuracy and relatively low Log Loss, but Macro F1 remained very low. In practice, the models still failed to identify minority classes `label=1~5`. This experiment compares three imbalance-oriented strategies: TabPFN prior correction, Class 1 synthetic augmentation, and a two-stage LightGBM + TabPFN pipeline.",
         "",
-        "## 2. 最终结果汇总",
+        "## 2. Final Comparison",
         "",
         "```text",
         table_text(final_rows),
         "```",
         "",
-        "## 3. 最优实验组分类报告",
+        "## 3. Classification Reports of Selected Runs",
         "",
     ]
     for name, text in reports.items():
@@ -324,33 +306,33 @@ def write_report(output_dir, final_rows, prior_df, synth_df, stage_df, reports):
 
     lines.extend(
         [
-            "## 4. 实验1：TabPFN + 先验概率修正扫描",
+            "## 4. Experiment 1: TabPFN Prior Correction Scan",
             "",
-            "这个实验通过替换类别先验，让模型更愿意预测少数类。它通常会提高少数类召回率，但也可能带来更多误报，并使 Log Loss 变差。",
+            "This experiment replaces the original training prior with a target prior. The goal is to make TabPFN less dominated by the majority class. This can increase minority recall, but it may also introduce more false positives and worsen Log Loss.",
             "",
             "```text",
             table_text(prior_df.drop(columns=["target_prior"], errors="ignore")),
             "```",
             "",
-            "## 5. 实验2：TabPFN + Class 1 合成数据增强",
+            "## 5. Experiment 2: TabPFN with Synthetic Class 1 Augmentation",
             "",
-            "这个实验对训练集中的 Class 1 样本做简单合成增强，再重新拟合 TabPFN。它用于观察增加极少数类样本后，模型是否更容易识别 Class 1。",
+            "This experiment augments the very rare Class 1 samples with reproducible synthetic samples, then refits TabPFN. The goal is to test whether increasing the number of Class 1 examples helps the model detect that class.",
             "",
             "```text",
-            table_text(synth_df) if not synth_df.empty else "本轮跳过了合成增强实验。",
+            table_text(synth_df) if not synth_df.empty else "Synthetic augmentation was skipped.",
             "```",
             "",
-            "## 6. 实验3：LightGBM + TabPFN 两阶段模型扫描",
+            "## 6. Experiment 3: Two-stage LightGBM + TabPFN Scan",
             "",
-            "这个实验先用 LightGBM 判断样本是否为异常类，即 `label>0`，再把判为异常的样本交给 TabPFN 做少数类细分。该结构的目标是把“异常检测”和“少数类细分类”拆开处理。",
+            "This experiment first uses LightGBM to detect whether a sample is abnormal, i.e. `label>0`. Samples predicted as abnormal are then passed to TabPFN for minority-class refinement. The motivation is to decouple abnormality detection from fine-grained minority classification.",
             "",
             "```text",
             table_text(stage_df),
             "```",
             "",
-            "## 7. 结果解读建议",
+            "## 7. Interpretation Notes",
             "",
-            "阅读结果时建议优先看 `Macro F1`、`Class 1 Recall` 和 `少数类整体 Recall`，不要只看 Accuracy。对于这份极端不平衡数据，Accuracy 很容易被多数类 `label=0` 主导。如果某个方法显著提升 Macro F1，但 Class 1 Recall 仍为 0，需要在报告中明确说明：该方法改善了整体少数类识别，但还没有真正解决最稀有类别的识别问题。",
+            "For this highly imbalanced dataset, Accuracy is dominated by the majority class `label=0`. The most informative metrics are Macro F1, Class 1 Recall, and overall minority Recall. If a method improves Macro F1 but Class 1 Recall remains 0, it should be described as improving minority-class behavior only partially, not as fully solving the rare-class recognition problem.",
             "",
         ]
     )
