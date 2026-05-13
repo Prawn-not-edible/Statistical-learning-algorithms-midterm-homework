@@ -27,6 +27,8 @@ ensemble_results/
 ensemble_results*/
 lr_interaction_ablation_results/
 lr_interaction_ablation_results*/
+temporal_feature_ablation_results/
+temporal_feature_ablation_results*/
 oof_ensemble_results/
 oof_ensemble_results*/
 
