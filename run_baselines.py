@@ -8,6 +8,9 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, f1_score, log_loss
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
 
 from baseline_preprocess import preprocess_baseline_data
 
@@ -122,6 +125,25 @@ def run_lightgbm(split, labels):
     return score_predictions(split["y_val"], pred, proba, labels)
 
 
+def run_logistic_regression(split, labels):
+    model = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(
+            C=1.0,
+            solver="lbfgs",
+            max_iter=5000,
+            random_state=RANDOM_STATE,
+        ),
+    )
+    fit_kwargs = {}
+    if split["w_train"] is not None:
+        fit_kwargs["logisticregression__sample_weight"] = split["w_train"]
+    model.fit(split["X_train"], split["y_train"], **fit_kwargs)
+    proba = ensure_proba_array(model.predict_proba(split["X_val"]), labels)
+    pred = model.predict(split["X_val"])
+    return score_predictions(split["y_val"], pred, proba, labels)
+
+
 def run_catboost(split, labels):
     from catboost import CatBoostClassifier
 
@@ -192,6 +214,7 @@ def run_autogluon(split, labels, output_dir: Path, use_weights: bool):
 
 
 MODEL_RUNNERS = {
+    "logistic_regression": run_logistic_regression,
     "xgboost": run_xgboost,
     "lightgbm": run_lightgbm,
     "catboost": run_catboost,
@@ -204,7 +227,7 @@ def parse_args():
     parser.add_argument(
         "--models",
         nargs="+",
-        default=["xgboost", "lightgbm", "catboost", "tabpfn", "autogluon"],
+        default=["logistic_regression", "xgboost", "lightgbm", "catboost", "tabpfn", "autogluon"],
         help="Models to run.",
     )
     parser.add_argument("--test-size", type=float, default=0.2)

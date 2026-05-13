@@ -19,9 +19,12 @@ eda_outputs/
 preprocessed_outputs/
 preprocessed_outputs_v2/
 baseline_results/
+baseline_results*/
 baseline_results_v2/
 ensemble_results/
 ensemble_results*/
+lr_interaction_ablation_results/
+lr_interaction_ablation_results*/
 oof_ensemble_results/
 oof_ensemble_results*/
 
